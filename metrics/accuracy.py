@@ -25,8 +25,18 @@ class AccuracyScore:
 
     @property
     def score(self):
-        return self._correct / self._total
+        try:
+            return self._correct / self._total
+        except ZeroDivisionError:
+            return 0
 
     def reset(self):
         self._correct = 0
         self._total = 0
+
+
+class AccuracyScoreFromLogits(AccuracyScore):
+    def __call__(self, y_true: torch.Tensor, y_predict_logits: torch.Tensor):
+        y_predict = y_predict_logits.max(1)[1].data
+        self._correct += (y_true == y_predict).sum().item()
+        self._total += np.prod(y_predict.shape)

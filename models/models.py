@@ -35,16 +35,16 @@ class DANNModel(BaseModel):
         features = self.features(input_data)
         features = self.pooling(features)
         features = torch.flatten(features, 1)
-        
+
         output_classifier = features
         classifier_layers_outputs = []
         for block in self.class_classifier:
             output_classifier = block(output_classifier)
             classifier_layers_outputs.append(output_classifier)
-        
+
         reversed_features = blocks.GradientReversalLayer.apply(features, dann_config.GRADIENT_REVERSAL_LAYER_ALPHA)
         output_domain = self.domain_classifier(reversed_features)
-        
+
         output = {
             "class": output_classifier,
             "domain": output_domain,
@@ -53,7 +53,7 @@ class DANNModel(BaseModel):
             output["classifier_layers"] = classifier_layers_outputs
 
         return output
-    
+
     def predict(self, input_data):
         """
         Args:

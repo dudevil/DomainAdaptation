@@ -49,7 +49,7 @@ def get_backbone_model():
     elif dann_config.MODEL_BACKBONE == "resnet50":
         features, pooling, classifier, pooling_ftrs, \
             pooling_output_side, classifier_layer_ids = get_resnet50()
-    elif dann_config.MODEL_BACKBONE == 'vanilla_dann' and dann_config.BACKBONE_PRETRAINED == False:
+    elif dann_config.MODEL_BACKBONE == 'vanilla_dann' and not dann_config.BACKBONE_PRETRAINED:
         features, pooling, classifier, pooling_ftrs, \
             pooling_output_side, classifier_layer_ids = get_vanilla_dann()        
     else:
