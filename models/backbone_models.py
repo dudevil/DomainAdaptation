@@ -97,7 +97,7 @@ def get_resnet50():
 
 def get_vanilla_dann():
     hidden_size = 64
-    pooling_output_side = (dann_config.IMAGE_SIDE - 12) // 4
+    pooling_output_side = 6
 
     features = nn.Sequential(
         nn.Conv2d(3, hidden_size, kernel_size=5),
@@ -110,7 +110,7 @@ def get_vanilla_dann():
         nn.MaxPool2d(2),
         nn.ReLU(),
     )
-    pooling = nn.Sequential()
+    pooling = nn.AdaptiveAvgPool2d((pooling_output_side, pooling_output_side))
     classifier = nn.Sequential(
         nn.Linear(hidden_size * pooling_output_side * pooling_output_side, hidden_size * 2),
         nn.BatchNorm1d(hidden_size * 2),
