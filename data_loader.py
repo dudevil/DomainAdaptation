@@ -1,6 +1,8 @@
 from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
+from torch.utils.data.dataloader import default_collate
+import torch
 
 
 class DataGenerator(DataLoader):
@@ -33,7 +35,7 @@ class DataGenerator(DataLoader):
 
 def create_data_generators(dataset_name, domain, data_path="data", batch_size=16,
                            transformations=None, num_workers=1, split_ratios=[0.8, 0.1, 0.1],
-                           image_size=500, infinite_train=False):
+                           image_size=500, infinite_train=False, device=torch.device('cpu')):
     """
     Args:
         dataset_name (string)
@@ -58,7 +60,7 @@ def create_data_generators(dataset_name, domain, data_path="data", batch_size=16
                                                 transforms.ToTensor(),
                                             ])
 
-    dataset = create_dataset(dataset_name, domain, data_path, transformations)
+    dataset = create_dataset(dataset_name, domain, data_path, transformations, device)
 
     len_dataset = len(dataset)
     train_size = int(len_dataset * split_ratios[0])
@@ -68,16 +70,19 @@ def create_data_generators(dataset_name, domain, data_path="data", batch_size=16
     train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
 
     train_dataloader = DataGenerator(is_infinite=infinite_train, dataset=train_dataset, batch_size=batch_size,
-                                     shuffle=True, num_workers=num_workers, drop_last=True)
+                                     shuffle=True, num_workers=num_workers, drop_last=True, 
+                                     collate_fn=lambda x: default_collate(x).to(device))
     val_dataloader = DataGenerator(is_infinite=False, dataset=val_dataset, batch_size=batch_size,
-                                   shuffle=False, num_workers=num_workers)
+                                   shuffle=False, num_workers=num_workers,
+                                   collate_fn=lambda x: default_collate(x).to(device))
     test_dataloader = DataGenerator(is_infinite=False, dataset=test_dataset, batch_size=batch_size,
-                                    shuffle=False, num_workers=num_workers)
+                                    shuffle=False, num_workers=num_workers,
+                                    collate_fn=lambda x: default_collate(x).to(device))
 
     return train_dataloader, val_dataloader, test_dataloader
 
 
-def create_dataset(dataset_name, domain, data_path, transformations):
+def create_dataset(dataset_name, domain, data_path, transformations, device):
     """
     Args:
         dataset_name (string)
