@@ -29,6 +29,7 @@ def random_batch(
 def test_loss_DANN(model_name, pretrained):
     """ Loss and model should work together without exceptions"""
     # for pretrained in [True, False]:
+    dann_config.IS_UNSUPERVISED = False
     dann_config.MODEL_BACKBONE = model_name
     dann_config.BACKBONE_PRETRAINED = pretrained
     if model_name == 'vanilla_dann' and pretrained:

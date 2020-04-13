@@ -1,10 +1,13 @@
 import pytest
 import numpy as np
 import torch
+
 from loss import _loss_DANN, _loss_DANN_splitted
+import configs.dann_config as dann_config
 
 
 def test__loss_DANN():
+    dann_config.IS_UNSUPERVISED = False
     class_logits = torch.Tensor(
         np.array([
             [1.0, 2, 3],
@@ -23,6 +26,7 @@ def test__loss_DANN():
 
 
 def test__loss_DANN_splitted():
+    dann_config.IS_UNSUPERVISED = False
     class_logits_src = torch.Tensor(
         np.array([
             [1.0, 2, 3],

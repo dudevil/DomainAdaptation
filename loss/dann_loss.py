@@ -12,6 +12,7 @@ def _loss_DANN(
         domain_loss_weight,
         prediction_loss_weight,
         unk_value=dann_config.UNK_VALUE,
+        device=torch.device('cpu')
 ):
     """
     :param class_predictions_logits: Tensor, shape = (batch_size, n_classes).
@@ -47,6 +48,7 @@ def _loss_DANN_splitted(
         domain_loss_weight,
         prediction_loss_weight,
         unk_value=dann_config.UNK_VALUE,
+        device=torch.device('cpu'),
 ):
     """
     :param class_logits_on_src: Tensor, shape = (batch_size, n_classes).
@@ -63,9 +65,12 @@ def _loss_DANN_splitted(
     source_len = len(class_logits_on_src)
     target_len = len(class_logits_on_trg)
     true_labels_on_src = torch.as_tensor(true_labels_on_src).long()
-    true_labels_on_trg = torch.as_tensor(true_labels_on_trg).long()
-    is_target_on_src = torch.zeros(source_len, dtype=torch.float)
-    is_target_on_trg = torch.ones(target_len, dtype=torch.float)
+    if dann_config.IS_UNSUPERVISED:
+        true_labels_on_trg = unk_value * torch.ones(target_len, dtype=torch.long, device=device)
+    else:
+        true_labels_on_trg = torch.as_tensor(true_labels_on_trg).long()
+    is_target_on_src = torch.zeros(source_len, dtype=torch.float, device=device)
+    is_target_on_trg = torch.ones(target_len, dtype=torch.float, device=device)
 
     crossentropy = torch.nn.CrossEntropyLoss(ignore_index=unk_value, reduction='sum')
     prediction_loss_on_src = crossentropy(class_logits_on_src, true_labels_on_src)
@@ -105,7 +110,8 @@ def calc_prediction_loss_weight(current_iteration, total_iterations):
 def loss_DANN(model,
               batch,
               epoch,
-              n_epochs):
+              n_epochs,
+              device=torch.device('cpu')):
     """
     :param model: model.forward(images) should return dict with keys
         'class' : Tensor, shape = (batch_size, n_classes)  logits  of classes (raw, not logsoftmax)
@@ -129,11 +135,11 @@ def loss_DANN(model,
             "prediction_loss"
         }
     """
-    model_output = model.forward(torch.Tensor(batch['src_images']))
+    model_output = model.forward(torch.tensor(batch['src_images'], device=device, dtype=torch.float))
     class_logits_on_src = model_output['class']
     logprobs_target_on_src = torch.squeeze(model_output['domain']) # TODO: maybe put torch.squeeze in model?
 
-    model_output = model.forward(torch.Tensor(batch['trg_images']))
+    model_output = model.forward(torch.tensor(batch['trg_images'], device=device, dtype=torch.float))
     class_logits_on_trg = model_output['class']
     logprobs_target_on_trg = torch.squeeze(model_output['domain'])
 
@@ -147,4 +153,5 @@ def loss_DANN(model,
         true_labels_on_src=batch['src_classes'],
         true_labels_on_trg=batch['trg_classes'],
         domain_loss_weight=domain_loss_weight,
-        prediction_loss_weight=prediction_loss_weight)
+        prediction_loss_weight=prediction_loss_weight,
+        device=device)

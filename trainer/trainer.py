@@ -37,7 +37,7 @@ class Trainer:
         return batch
 
     def fit(self, src_data, trg_data, n_epochs=1000, steps_per_epoch=100, val_freq=1,
-            opt='adam', opt_kwargs=None, validation_data=None, metrics=None, callback=None):
+            opt='adam', opt_kwargs=None, validation_data=None, metrics=None, callbacks=None):
         self.n_epochs = n_epochs
 
         if opt_kwargs is None:
@@ -65,9 +65,10 @@ class Trainer:
                     trg_metrics = self.score(trg_val_data, metrics)
                     self.last_epoch_history['trg_metrics'] = trg_metrics
 
-            if callback is not None:
+            if callbacks is not None:
                 self.last_epoch_history['loss'] /= steps_per_epoch
-                callback(self.last_epoch_history, self.epoch, n_epochs)
+                for callback in callbacks:
+                    callback(self.model, self.last_epoch_history, self.epoch, n_epochs)
 
     def score(self, data, metrics):
         for metric in metrics:
