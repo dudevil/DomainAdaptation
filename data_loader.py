@@ -69,17 +69,15 @@ def create_data_generators(dataset_name, domain, data_path="data", batch_size=16
     val_size = int(len_dataset * split_ratios[1])
     test_size = len_dataset - train_size - val_size
 
+    torch.manual_seed(42)
     train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
 
     train_dataloader = DataGenerator(is_infinite=infinite_train, device=device, dataset=train_dataset,
-                                     batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True,
-                                     collate_fn=lambda x: [elem for elem in default_collate(x)])
+                                     batch_size=batch_size, shuffle=True, num_workers=num_workers, drop_last=True)
     val_dataloader = DataGenerator(is_infinite=False, device=device, dataset=val_dataset,
-                                   batch_size=batch_size, shuffle=False, num_workers=num_workers,
-                                    collate_fn=lambda x: [elem for elem in default_collate(x)])
+                                   batch_size=batch_size, shuffle=False, num_workers=num_workers)
     test_dataloader = DataGenerator(is_infinite=False, device=device, dataset=test_dataset,
-                                    batch_size=batch_size, shuffle=False, num_workers=num_workers,
-                                    collate_fn=lambda x: [elem for elem in default_collate(x)])
+                                    batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     return train_dataloader, val_dataloader, test_dataloader
 
