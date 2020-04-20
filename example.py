@@ -1,13 +1,15 @@
 import torch
+import os
 
 from trainer import Trainer
 from loss import loss_DANN
 from models import DANNModel
 from data_loader import create_data_generators
 from metrics import AccuracyScoreFromLogits
-from utils.callbacks import simple_callback, ModelSaver
+from utils.callbacks import simple_callback, ModelSaver, HistorySaver
 import configs.dann_config as dann_config
 
+# os.environ['CUDA_VISIBLE_DEVICES'] = '4, 5'
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def only_loss(*args, **kwargs):
@@ -49,9 +51,11 @@ if __name__ == '__main__':
                                                                 image_size=dann_config.IMAGE_SIZE,
                                                                 num_workers=dann_config.NUM_WORKERS,
                                                                 device=device)
+
     model = DANNModel().to(device)
     acc = AccuracyScoreFromLogits()
     mmm = DebugMetric(acc)
+    val_freq = 5
 
     tr = Trainer(model, only_loss)
     tr.fit(train_gen_s, train_gen_t,
@@ -59,4 +63,5 @@ if __name__ == '__main__':
            validation_data=[val_gen_s, val_gen_t],
            metrics=[acc],
            steps_per_epoch=dann_config.STEPS_PER_EPOCH,
-           callbacks=[simple_callback, ModelSaver("DANN")])
+           val_freq=val_freq,
+           callbacks=[simple_callback, ModelSaver('DANN', val_freq), HistorySaver('test_log', val_freq)])

@@ -1,5 +1,5 @@
 import torch
-
+import tqdm
 
 class Trainer:
     def __init__(self, model, loss):
@@ -11,16 +11,21 @@ class Trainer:
     def _reset_last_epoch_history(self):
         self.last_epoch_history = {
             'loss': 0.0,
+            'val_loss': 0.0,
             'src_metrics': {},
             'trg_metrics': {}
         }
 
-    def train_on_batch(self, src_batch, trg_batch, opt):
-        self.model.train()
+    def calc_loss(self, src_batch, trg_batch):
         batch = self._merge_batches(src_batch, trg_batch)
         metadata = {'epoch': self.epoch, 'n_epochs': self.n_epochs}
         loss = self.loss(self.model, batch, **metadata)
-        self.last_epoch_history['loss'] += loss
+        return loss
+
+    def train_on_batch(self, src_batch, trg_batch, opt):
+        self.model.train()
+        loss = self.calc_loss(src_batch, trg_batch)
+        self.last_epoch_history['loss'] += loss.data.cpu().item()
 
         opt.zero_grad()
         loss.backward()
@@ -38,6 +43,7 @@ class Trainer:
 
     def fit(self, src_data, trg_data, n_epochs=1000, steps_per_epoch=100, val_freq=1,
             opt='adam', opt_kwargs=None, validation_data=None, metrics=None, callbacks=None):
+
         self.n_epochs = n_epochs
 
         if opt_kwargs is None:
@@ -48,25 +54,41 @@ class Trainer:
         else:
             raise NotImplementedError
 
-        for self.epoch in range(self.epoch, n_epochs):
+        if validation_data is not None:
+            src_val_data, trg_val_data = validation_data
+
+        for self.epoch in tqdm.trange(self.epoch, n_epochs):
             self._reset_last_epoch_history()
-            for step, (src_batch, trg_batch) in enumerate(zip(src_data, trg_data)):
+            for step, (src_batch, trg_batch) in tqdm.tqdm(enumerate(zip(src_data, trg_data)), total=steps_per_epoch):
                 if step == steps_per_epoch:
                     break
                 self.train_on_batch(src_batch, trg_batch, opt)
 
-            if metrics is not None and self.epoch % val_freq == 0:
-                src_val_data, trg_val_data = validation_data
+            self.last_epoch_history['loss'] /= steps_per_epoch
+
+            # validation
+            if self.epoch % val_freq == 0 and validation_data is not None:
                 self.model.eval()
-                if src_val_data is not None:
-                    src_metrics = self.score(src_val_data, metrics)
-                    self.last_epoch_history['src_metrics'] = src_metrics
-                if trg_val_data is not None:
-                    trg_metrics = self.score(trg_val_data, metrics)
-                    self.last_epoch_history['trg_metrics'] = trg_metrics
+
+                # calculating metrics on validation
+                if metrics is not None:
+                    if src_val_data is not None:
+                        src_metrics = self.score(src_val_data, metrics)
+                        self.last_epoch_history['src_metrics'] = src_metrics
+                    if trg_val_data is not None:
+                        trg_metrics = self.score(trg_val_data, metrics)
+                        self.last_epoch_history['trg_metrics'] = trg_metrics
+
+                # calculating loss on validation
+                if src_val_data is not None and trg_val_data is not None:
+                    val_step = 0
+                    for val_step, (src_batch, trg_batch) in enumerate(zip(src_val_data, trg_val_data)):
+                        loss = self.calc_loss(src_batch, trg_batch).detach().cpu().item()
+                        self.last_epoch_history['val_loss'] += loss
+                    if val_step:
+                        self.last_epoch_history['val_loss'] /= val_step
 
             if callbacks is not None:
-                self.last_epoch_history['loss'] /= steps_per_epoch
                 for callback in callbacks:
                     callback(self.model, self.last_epoch_history, self.epoch, n_epochs)
 
@@ -79,6 +101,7 @@ class Trainer:
             pred_classes = self.model.predict(images)
             for metric in metrics:
                 metric(true_classes, pred_classes)
+        data.reload_iterator()
         return {metric.name: metric.score for metric in metrics}
 
     def predict(self, data):

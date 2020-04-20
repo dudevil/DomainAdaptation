@@ -1,7 +1,6 @@
 from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
-from torch.utils.data.dataloader import default_collate
 import torch
 
 

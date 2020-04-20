@@ -25,8 +25,8 @@ def _loss_DANN(
     :param prediction_loss_weight: weight of prediction loss
     :param unk_value: value that means that true label is unknown
     """
-    instances_labels = torch.Tensor(instances_labels).long()
-    is_target = torch.Tensor(is_target).float()
+    instances_labels = instances_labels.long()
+    is_target = is_target.float()
 
     crossentropy = torch.nn.CrossEntropyLoss(ignore_index=unk_value)
     prediction_loss = crossentropy(class_predictions_logits, instances_labels)
@@ -135,13 +135,13 @@ def loss_DANN(model,
             "prediction_loss"
         }
     """
-    model_output = model.forward(torch.tensor(batch['src_images'], device=device, dtype=torch.float))
+    model_output = model.forward(batch['src_images'].to(device))
     class_logits_on_src = model_output['class']
-    logprobs_target_on_src = torch.squeeze(model_output['domain']) # TODO: maybe put torch.squeeze in model?
+    logprobs_target_on_src = torch.squeeze(model_output['domain'], dim=-1) # TODO: maybe put torch.squeeze in model?
 
-    model_output = model.forward(torch.tensor(batch['trg_images'], device=device, dtype=torch.float))
+    model_output = model.forward(batch['trg_images'].to(device))
     class_logits_on_trg = model_output['class']
-    logprobs_target_on_trg = torch.squeeze(model_output['domain'])
+    logprobs_target_on_trg = torch.squeeze(model_output['domain'], dim=-1)
 
     domain_loss_weight = calc_domain_loss_weight(epoch, n_epochs)
     prediction_loss_weight = calc_prediction_loss_weight(epoch, n_epochs)
