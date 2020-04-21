@@ -99,7 +99,7 @@ def calc_domain_loss_weight(current_iteration,
                             total_iterations,
                             gamma=dann_config.LOSS_GAMMA):
     progress = current_iteration / total_iterations
-    lambda_p = 2 / (1 + np.exp(-gamma * progress))
+    lambda_p = 2 / (1 + np.exp(-gamma * progress)) - 1
     return lambda_p
 
 

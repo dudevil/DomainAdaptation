@@ -7,6 +7,7 @@ class Trainer:
         self.loss = loss
         self.epoch = 0
         self.last_epoch_history = None
+        self.device = next(self.model.parameters()).device
 
     def _reset_last_epoch_history(self):
         self.last_epoch_history = {
@@ -19,7 +20,7 @@ class Trainer:
     def calc_loss(self, src_batch, trg_batch):
         batch = self._merge_batches(src_batch, trg_batch)
         metadata = {'epoch': self.epoch, 'n_epochs': self.n_epochs}
-        loss = self.loss(self.model, batch, **metadata)
+        loss = self.loss(self.model, batch, device=self.device, **metadata)
         return loss
 
     def train_on_batch(self, src_batch, trg_batch, opt):
@@ -56,10 +57,13 @@ class Trainer:
 
         if validation_data is not None:
             src_val_data, trg_val_data = validation_data
+           
+        if hasattr(tqdm, '_instances'):
+            tqdm._instances.clear()
 
-        for self.epoch in tqdm.trange(self.epoch, n_epochs):
+        for self.epoch in range(self.epoch, n_epochs):
             self._reset_last_epoch_history()
-            for step, (src_batch, trg_batch) in tqdm.tqdm(enumerate(zip(src_data, trg_data)), total=steps_per_epoch):
+            for step, (src_batch, trg_batch) in enumerate(zip(src_data, trg_data)):  # removed tqdm
                 if step == steps_per_epoch:
                     break
                 self.train_on_batch(src_batch, trg_batch, opt)
