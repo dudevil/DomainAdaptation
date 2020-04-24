@@ -1,5 +1,5 @@
 import torch
-import tqdm
+
 
 class Trainer:
     def __init__(self, model, loss):
@@ -43,7 +43,8 @@ class Trainer:
         return batch
 
     def fit(self, src_data, trg_data, n_epochs=1000, steps_per_epoch=100, val_freq=1,
-            opt='adam', opt_kwargs=None, validation_data=None, metrics=None, callbacks=None):
+            opt='adam', opt_kwargs=None, validation_data=None, metrics=None,
+            lr_scheduler=None, callbacks=None):
 
         self.n_epochs = n_epochs
 
@@ -52,18 +53,17 @@ class Trainer:
 
         if opt == 'adam':
             opt = torch.optim.Adam(self.model.parameters(), **opt_kwargs)
+        elif opt == 'sgd':
+            opt = torch.optim.SGD(self.model.parameters(), **opt_kwargs)
         else:
             raise NotImplementedError
 
         if validation_data is not None:
             src_val_data, trg_val_data = validation_data
-           
-        if hasattr(tqdm, '_instances'):
-            tqdm._instances.clear()
 
         for self.epoch in range(self.epoch, n_epochs):
             self._reset_last_epoch_history()
-            for step, (src_batch, trg_batch) in enumerate(zip(src_data, trg_data)):  # removed tqdm
+            for step, (src_batch, trg_batch) in enumerate(zip(src_data, trg_data)):
                 if step == steps_per_epoch:
                     break
                 self.train_on_batch(src_batch, trg_batch, opt)
@@ -95,6 +95,9 @@ class Trainer:
             if callbacks is not None:
                 for callback in callbacks:
                     callback(self.model, self.last_epoch_history, self.epoch, n_epochs)
+
+            if lr_scheduler:
+                lr_scheduler.step(opt, self.epoch, n_epochs)
 
     def score(self, data, metrics):
         for metric in metrics:

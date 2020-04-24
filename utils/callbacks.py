@@ -37,8 +37,6 @@ class HistorySaver:
     defaultdict = defaultdict
 
     def __init__(self, log_name, val_freq=1, path="_log", plot=True):
-        self.log_name = log_name
-        self.path = path
         self.is_plotting = plot
         self.val_freq = val_freq
         self.loss_history = self.defaultdict(list)
@@ -50,6 +48,10 @@ class HistorySaver:
             self.plt = plt
         if not os.path.exists(path):
             os.makedirs(path)
+        if not os.path.exists(os.path.join(path, log_name)):
+            os.makedirs(os.path.join(path, log_name))
+
+        self.path = os.path.join(path, log_name)
 
     def _plot(self, data, name, current_epoch, total_epoch):
         self.plt.figure(figsize=(6, 4))
@@ -62,7 +64,7 @@ class HistorySaver:
 
         self.plt.legend()
         self.plt.title('{} history for {} epochs of {}'.format(name, current_epoch + 1, total_epoch))
-        self.plt.savefig(os.path.join(self.path, name +'_plot'))
+        self.plt.savefig(os.path.join(self.path, name + '_plot'))
 
     def plot_all(self, current_epoch, total_epoch):
         self._plot(self.loss_history, 'loss', current_epoch, total_epoch)
