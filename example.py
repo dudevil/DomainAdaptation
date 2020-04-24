@@ -13,7 +13,7 @@ import configs.dann_config as dann_config
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def only_loss(*args, **kwargs):
-    loss, rich_loss = loss_DANN(device=device, *args, **kwargs)
+    loss, rich_loss = loss_DANN(*args, **kwargs)
     loss_string = '   '.join(['{}: {:.5f}\t'.format(k, float(v)) for k, v in rich_loss.items()])
     print(f"step_loss: {loss_string}")
     return loss
@@ -55,7 +55,6 @@ if __name__ == '__main__':
     model = DANNModel().to(device)
     acc = AccuracyScoreFromLogits()
     mmm = DebugMetric(acc)
-    val_freq = 5
 
     tr = Trainer(model, only_loss)
     tr.fit(train_gen_s, train_gen_t,
@@ -63,5 +62,6 @@ if __name__ == '__main__':
            validation_data=[val_gen_s, val_gen_t],
            metrics=[acc],
            steps_per_epoch=dann_config.STEPS_PER_EPOCH,
-           val_freq=val_freq,
-           callbacks=[simple_callback, ModelSaver('DANN', val_freq), HistorySaver('test_log', val_freq)])
+           val_freq=dann_config.VAL_FREQ,
+           callbacks=[simple_callback, ModelSaver('DANN', dann_config.SAVE_MODEL_FREQ),
+                      HistorySaver('test_log', dann_config.VAL_FREQ)])

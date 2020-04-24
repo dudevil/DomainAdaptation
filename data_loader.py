@@ -59,6 +59,8 @@ def create_data_generators(dataset_name, domain, data_path="data", batch_size=16
         transformations = transforms.Compose([
                                                 transforms.Resize(image_size),
                                                 transforms.ToTensor(),
+                                                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                    std=[0.229, 0.224, 0.225]),
                                             ])
 
     dataset = create_dataset(dataset_name, domain, data_path, transformations, device)
