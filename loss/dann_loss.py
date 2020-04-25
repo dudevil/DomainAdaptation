@@ -95,12 +95,16 @@ def _loss_DANN_splitted(
     }
 
 
-def calc_domain_loss_weight(current_iteration,
-                            total_iterations,
-                            gamma=dann_config.LOSS_GAMMA):
+def calc_rev_grad_alpha(current_iteration,
+                        total_iterations,
+                        gamma=dann_config.LOSS_GAMMA):
     progress = current_iteration / total_iterations
     lambda_p = 2 / (1 + np.exp(-gamma * progress)) - 1
     return lambda_p
+
+
+def calc_domain_loss_weight(current_iteration, total_iterations):
+    return 1
 
 
 def calc_prediction_loss_weight(current_iteration, total_iterations):
@@ -135,11 +139,13 @@ def loss_DANN(model,
             "prediction_loss"
         }
     """
-    model_output = model.forward(batch['src_images'].to(device))
+    rev_grad_alpha = calc_rev_grad_alpha(epoch, n_epochs)
+    
+    model_output = model.forward(batch['src_images'].to(device), rev_grad_alpha)
     class_logits_on_src = model_output['class']
     logprobs_target_on_src = torch.squeeze(model_output['domain'], dim=-1) # TODO: maybe put torch.squeeze in model?
 
-    model_output = model.forward(batch['trg_images'].to(device))
+    model_output = model.forward(batch['trg_images'].to(device), rev_grad_alpha)
     class_logits_on_trg = model_output['class']
     logprobs_target_on_trg = torch.squeeze(model_output['domain'], dim=-1)
 

@@ -28,7 +28,7 @@ class DANNModel(BaseModel):
             nn.Linear(1024, 1),
         )        
 
-    def forward(self, input_data):
+    def forward(self, input_data, rev_grad_alpha=dann_config.GRADIENT_REVERSAL_LAYER_ALPHA):
         """
         Args:
             input_data (torch.tensor) - batch of input images
@@ -48,7 +48,7 @@ class DANNModel(BaseModel):
             output_classifier = block(output_classifier)
             classifier_layers_outputs.append(output_classifier)
 
-        reversed_features = blocks.GradientReversalLayer.apply(domain_features, dann_config.GRADIENT_REVERSAL_LAYER_ALPHA)
+        reversed_features = blocks.GradientReversalLayer.apply(domain_features, rev_grad_alpha)
         output_domain = self.domain_classifier(reversed_features)
 
         output = {
