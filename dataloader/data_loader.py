@@ -1,40 +1,29 @@
 import numpy as np
+import torch
 
-from torchvision.datasets import ImageFolder
+from torchvision.datasets import ImageFolder, MNIST
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
-import torch
 
 import configs.dann_config as dann_config
 
-
-class CustomDataset(ImageFolder):
-    """
-        Interface for datasets.
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def get_semi_supervised_indexes_for_subset(self, labeled_ratio, subset_indices):
-        """
-        Used for data separation in semi-supervised approaches
-            Input:
-                labeled_ratio - ratio of labeled images
-                subset_indices - indexes of considered subset in dataset
-            Output: list[int], list[int] - indexes of labeled and unlabeled items in considered subset
-
-        """
-        return NotImplemented
+from dataloader.mnistm_dataset import MNISTM
 
 
-class Office31Dataset(CustomDataset):
+class Office31Dataset(ImageFolder):
     """
         Office31 Dataset class.
         More info about the dataset: https://people.eecs.berkeley.edu/~jhoffman/domainadapt/
         Data link: https://drive.google.com/file/d/0B4IapRTv9pJ1WGZVd1VDMmhwdlE/view
     """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, root, transform, image_size, **kwargs):
+        if transform is None:
+            transform = transforms.Compose([
+                transforms.Resize(image_size),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ])
+        super().__init__(root, transform=transform, **kwargs)
 
     def get_semi_supervised_indexes_for_subset(self, labeled_ratio, subset_indices):
         subset_images_with_classes = np.array(self.imgs)[subset_indices]
@@ -57,6 +46,39 @@ class Office31Dataset(CustomDataset):
             unlabeled_indexes.extend(all_class_indexes[labeled_num:])
 
         return labeled_indexes, unlabeled_indexes
+    
+    
+class MnistDataset(MNIST):
+    """
+        MNIST Dataset class. Inherits from `torchvision.datasets.MNIST`.
+    """
+    def __init__(self, root, transform, image_size, **kwargs):
+        if transform is None:
+            transform = transforms.Compose([
+                transforms.Grayscale(3),
+                transforms.Resize(image_size),
+                transforms.ToTensor(),
+            ])
+        super().__init__(root, transform=transform, **kwargs)
+    
+    def get_semi_supervised_indexes_for_subset(self):
+        raise NotImplementedError
+        
+
+class MnistMDataset(MNISTM):
+    """
+        MNIST-M Dataset class.
+    """
+    def __init__(self, root, mnist_root, transform, image_size, **kwargs):
+        if transform is None:
+            transform = transforms.Compose([
+                transforms.Resize(image_size),
+                transforms.ToTensor(),
+            ])
+        super().__init__(root, mnist_root, transform=transform, **kwargs)
+    
+    def get_semi_supervised_indexes_for_subset(self):
+        raise NotImplementedError
 
 
 class DataGenerator(DataLoader):
@@ -87,13 +109,13 @@ class DataGenerator(DataLoader):
 
     def get_classes(self):
         return self.dataset.dataset.classes
-
-
+    
+    
 class SemiSupervisedDataGenerator:
     def __init__(self, dataset, is_infinite, labeled_ratio, batch_size,
                  unk_value=dann_config.UNK_VALUE, *args, **kwargs):
         assert labeled_ratio is not None, "labeled ratio argument should be provided for semi-supervised dataset"
-        # need dataset.dataset as dataaset - dataset subset created because of splitting to train, val, test
+        # need dataset.dataset as dataset - dataset subset created because of splitting to train, val, test
         labeled_indexes, unlabeled_indexes = dataset.dataset.get_semi_supervised_indexes_for_subset(labeled_ratio,
                                                                                                     dataset.indices)
         self.batch_size = batch_size
@@ -129,9 +151,10 @@ class SemiSupervisedDataGenerator:
 
 
 def create_data_generators(dataset_name, domain, data_path="data", batch_size=16,
-                           transformations=None, num_workers=1, split_ratios=[0.8, 0.1, 0.1],
+                           transform=None, num_workers=1, split_ratios=[0.8, 0.1, 0.1],
                            image_size=500, infinite_train=False, device=torch.device('cpu'),
-                           semi_supervised=False, semi_supervised_labeled_ratio=None):
+                           semi_supervised=False, semi_supervised_labeled_ratio=None,
+                           random_seed=42):
     """
     Args:
         dataset_name (string)
@@ -140,34 +163,25 @@ def create_data_generators(dataset_name, domain, data_path="data", batch_size=16
         data_path (string)
             - valid path, which contains dataset_name folder
         batch_size (int)
-        transformations (callable)
+        transform (callable)
             - optional transform applied on image sample
         num_workers (int)
             - multi-process data loading
         split_ratios (list of ints, len(split_ratios) = 3)
-            - ratios of train, validation and test parts
+            - ratios of train, validation and test parts,
+              in case of MNIST dataset two first values are scaled and used, 
+              as test dataset is fixed
 
     Return:
         3 data generators  - for train, validation and test data
     """
-    if transformations is None:
-        transformations = transforms.Compose([
-                                                transforms.Resize(image_size),
-                                                transforms.ToTensor(),
-                                                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                                    std=[0.229, 0.224, 0.225]),
-                                            ])
-
-    dataset = create_dataset(dataset_name, domain, data_path, transformations, device)
-
-    len_dataset = len(dataset)
-    train_size = int(len_dataset * split_ratios[0])
-    val_size = int(len_dataset * split_ratios[1])
-    test_size = len_dataset - train_size - val_size
-
-    torch.manual_seed(42)
-    train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
-
+        
+    if random_seed is not None:
+        torch.manual_seed(random_seed)
+    
+    train_dataset, val_dataset, test_dataset = create_dataset(dataset_name, domain, data_path, split_ratios, 
+                                                              transform, image_size, device)
+    
     if semi_supervised:
         train_dataloader = SemiSupervisedDataGenerator(is_infinite=infinite_train,
                                                        labeled_ratio=semi_supervised_labeled_ratio,
@@ -185,7 +199,7 @@ def create_data_generators(dataset_name, domain, data_path="data", batch_size=16
     return train_dataloader, val_dataloader, test_dataloader
 
 
-def create_dataset(dataset_name, domain, data_path, transformations, device):
+def create_dataset(dataset_name, domain, data_path, split_ratios, transform, image_size, device):
     """
     Args:
         dataset_name (string)
@@ -200,15 +214,50 @@ def create_dataset(dataset_name, domain, data_path, transformations, device):
         torchvision.dataset object
     """
 
-    assert dataset_name in ["office-31"], f"Dataset {dataset_name} is not implemented"
+    assert dataset_name in ["office-31", "mnist"], f"Dataset {dataset_name} is not implemented"
 
     if dataset_name == "office-31":
-
         dataset_domains = ["amazon", "dslr", "webcam"]
 
         assert domain in dataset_domains, f"Incorrect domain {domain}: " + \
             f"dataset {dataset_name} domains: {dataset_domains}"
 
-        dataset = Office31Dataset(f"{data_path}/{dataset_name}/{domain}/images", transform=transformations)
+        dataset = Office31Dataset(f"{data_path}/{dataset_name}/{domain}/images", transform=transform, image_size=image_size)
+        
+        len_dataset = len(dataset)
+        train_size = int(len_dataset * split_ratios[0])
+        val_size = int(len_dataset * split_ratios[1])
+        test_size = len_dataset - train_size - val_size
+        
+        train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
+    
+    elif dataset_name == "mnist":
+        
+        dataset_domains = ["mnist", "mnist-m"]
+        
+        assert domain in dataset_domains, f"Incorrect domain {domain}: " + \
+            f"dataset {dataset_name} domains: {dataset_domains}"
+        
+        if domain == "mnist":
+            train_dataset = MnistDataset(f"{data_path}/{dataset_name}/{domain}",
+                                         train=True, transform=transform, image_size=image_size, download=True)
+            test_dataset = MnistDataset(f"{data_path}/{dataset_name}/{domain}",
+                                        train=False, transform=transform, image_size=image_size, download=True)
+        elif domain == "mnist-m":
+            train_dataset = MnistMDataset(f"{data_path}/{dataset_name}/{domain}",
+                                          f"{data_path}/{dataset_name}/mnist",
+                                          train=True, transform=transform, image_size=image_size, download=True)
+            test_dataset = MnistMDataset(f"{data_path}/{dataset_name}/{domain}",
+                                         f"{data_path}/{dataset_name}/mnist",
+                                         train=False, transform=transform, image_size=image_size, download=True)
+        
+        split_ratios = [split_ratios[0] / sum(split_ratios[0:2]),
+                        split_ratios[1] / sum(split_ratios[0:2])]  # test_size is fixed in MNIST
+        
+        len_dataset = len(train_dataset)
+        train_size = int(len_dataset * split_ratios[0])
+        val_size = len_dataset - train_size
+        
+        train_dataset, val_dataset = random_split(train_dataset, [train_size, val_size])
 
-    return dataset
+    return train_dataset, val_dataset, test_dataset

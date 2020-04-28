@@ -3,6 +3,7 @@ import torch.nn as nn
 
 import configs.dann_config as dann_config
 import models.backbone_models as backbone_models
+import models.domain_heads as domain_heads
 import models.blocks as blocks
 
 
@@ -18,15 +19,7 @@ class DANNModel(BaseModel):
         self.features, self.pooling, self.class_classifier, \
             domain_input_len, self.classifier_before_domain_cnt = backbone_models.get_backbone_model()
         
-        self.domain_classifier = nn.Sequential(
-            nn.Linear(domain_input_len, 1024),
-            nn.BatchNorm1d(1024),
-            nn.ReLU(),
-            nn.Linear(1024, 1024),
-            nn.BatchNorm1d(1024),
-            nn.ReLU(),
-            nn.Linear(1024, 1),
-        )        
+        self.domain_classifier = domain_heads.get_domain_head(domain_input_len)
 
     def forward(self, input_data, rev_grad_alpha=dann_config.GRADIENT_REVERSAL_LAYER_ALPHA):
         """
@@ -70,4 +63,4 @@ class DANNModel(BaseModel):
         Function for testing process when need to solve only
         target task.
         """
-        return self.forward(input_data)["class"]
+        return self.forward(input_data)["class"] 

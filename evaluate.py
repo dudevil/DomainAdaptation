@@ -3,7 +3,7 @@ import torch
 
 from trainer import Trainer
 from models import DANNModel
-from data_loader import create_data_generators
+from dataloader import create_data_generators
 from metrics import AccuracyScoreFromLogits
 import configs.dann_config as dann_config
 

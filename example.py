@@ -4,7 +4,7 @@ import os
 from trainer import Trainer
 from loss import loss_DANN
 from models import DANNModel
-from data_loader import create_data_generators
+from dataloader import create_data_generators
 from metrics import AccuracyScoreFromLogits
 from utils.callbacks import simple_callback, print_callback, ModelSaver, HistorySaver
 from utils.schedulers import LRSchedulerSGD

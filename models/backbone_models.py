@@ -50,7 +50,10 @@ def get_backbone_model():
             classifier_layer_ids, domain_input_len, classifier_before_domain_cnt = get_resnet50()
     elif dann_config.MODEL_BACKBONE == 'vanilla_dann' and not dann_config.BACKBONE_PRETRAINED:
         features, pooling, classifier, \
-            classifier_layer_ids, domain_input_len, classifier_before_domain_cnt = get_vanilla_dann()        
+            classifier_layer_ids, domain_input_len, classifier_before_domain_cnt = get_vanilla_dann()
+    elif dann_config.MODEL_BACKBONE == 'mnist_dann' and not dann_config.BACKBONE_PRETRAINED:
+        features, pooling, classifier, \
+            classifier_layer_ids, domain_input_len, classifier_before_domain_cnt = get_mnist_dann()  
     else:
         raise RuntimeError("model %s with pretrained = %s, does not exist" \
             % (dann_config.MODEL_BACKBONE, dann_config.BACKBONE_PRETRAINED))
@@ -129,4 +132,33 @@ def get_vanilla_dann():
     )
     classifier_layer_ids = [0, 4, 7]
     pooling_ftrs = hidden_size
-    return features, pooling, classifier, classifier_layer_ids,  hidden_size * 2, 2
+    return features, pooling, classifier, classifier_layer_ids, hidden_size * 2, 2
+
+
+def get_mnist_dann():
+    pooling_output_side = 4
+    
+    features = nn.Sequential(
+        nn.Conv2d(3, 32, kernel_size=5),  # [b, 32, 24, 24]
+        nn.BatchNorm2d(32),
+        nn.MaxPool2d(2, stride=2),  # [b, 32, 12, 12]
+        nn.ReLU(),
+        nn.Conv2d(32, 48, kernel_size=5),  # [b, 48, 8, 8]
+        nn.BatchNorm2d(48),
+        nn.Dropout2d(),
+        nn.MaxPool2d(2, stride=2),  # [b, 48, 4, 4]
+        nn.ReLU(),
+    )
+    pooling = nn.AdaptiveAvgPool2d((pooling_output_side, pooling_output_side))
+    classifier = nn.Sequential(
+        nn.Linear(48 * pooling_output_side * pooling_output_side, 100),
+        nn.BatchNorm1d(100),
+        nn.Dropout2d(),
+        nn.ReLU(),
+        nn.Linear(100, 100),
+        nn.BatchNorm1d(100),
+        nn.ReLU(),
+        nn.Linear(100, dann_config.CLASSES_CNT),
+    )
+    classifier_layer_ids = [0, 4, 7]
+    return features, pooling, classifier, classifier_layer_ids, 48 * pooling_output_side * pooling_output_side, 0
