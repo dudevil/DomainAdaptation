@@ -13,6 +13,30 @@ def simple_callback(model, epoch_log, current_epoch, total_epoch):
     print(message_head + message_loss + message_src_metrics + message_trg_metrics)
 
 
+class print_callback:
+    def __init__(self, watch=None):
+        """
+        Callback which prints everything from log (by default)
+        or items specified by watch list
+        """
+        if watch is not None:
+            self.watch = set(watch)
+        else:
+            self.watch = None
+        
+    def __call__(self, model, epoch_log, current_epoch, total_epoch):
+        print('Epoch {}/{}'.format(current_epoch+1, total_epoch))
+        for key, value in epoch_log.items():
+            if (self.watch is None) or (key in self.watch):
+                if not key.endswith('metrics'):
+                    print('{}: {:.5f}'.format(key, value))
+                elif key == 'trg_metrics':
+                    print(' '.join(['val_trg_{}: {:<10}\t'.format(k, v) for k, v in epoch_log['trg_metrics'].items()]))
+                elif key == 'src_metrics':
+                    print(' '.join(['val_src_{}: {:<10}\t'.format(k, v) for k, v in epoch_log['src_metrics'].items()]))
+        print()
+
+
 class ModelSaver:
     def __init__(self, model_type, save_freq=1, path="checkpoints"):
         self.model_type = model_type
@@ -36,12 +60,16 @@ class HistorySaver:
     json = json
     defaultdict = defaultdict
 
-    def __init__(self, log_name, val_freq=1, path="_log", plot=True):
+    def __init__(self, log_name, val_freq=1, path="_log", plot=True, extra_losses=None):
         self.is_plotting = plot
         self.val_freq = val_freq
         self.loss_history = self.defaultdict(list)
         self.src_metrics_history = self.defaultdict(list)
         self.trg_metrics_history = self.defaultdict(list)
+        
+        self.extra_losses = extra_losses
+        if extra_losses is not None:
+            self.extra_losses_history = self.defaultdict(list)
 
         if plot:
             import matplotlib.pyplot as plt
@@ -70,6 +98,11 @@ class HistorySaver:
         self._plot(self.loss_history, 'loss', current_epoch, total_epoch)
         self._plot(self.src_metrics_history, 'src_metrics', current_epoch, total_epoch)
         self._plot(self.trg_metrics_history, 'trg_metrics', current_epoch, total_epoch)
+        
+        if self.extra_losses is not None:
+            for pic_name, loss_names in self.extra_losses.items():
+                self._plot({k: v for k, v in self.extra_losses_history.items() if k in loss_names},
+                           pic_name, current_epoch, total_epoch)
         self.plt.close('all')
 
     def _save_to_json(self, data, name=None):
@@ -86,12 +119,20 @@ class HistorySaver:
 
             for metric in epoch_log['src_metrics']:
                 self.src_metrics_history[metric].append(epoch_log['src_metrics'][metric])
+            
+            if self.extra_losses is not None:
+                for loss_names in self.extra_losses.values():
+                    for loss_name in loss_names:
+                        self.extra_losses_history[loss_name].append(epoch_log[loss_name])
 
         self.loss_history['loss'].append(epoch_log['loss'])
 
         self._save_to_json(self.loss_history, name='loss_history')
         self._save_to_json(self.src_metrics_history, name='src_metrics')
         self._save_to_json(self.trg_metrics_history, name='trg_metrics')
+        
+        if self.extra_losses is not None:
+            self._save_to_json(self.extra_losses_history, name='extra_losses')
 
         if self.is_plotting:
             self.plot_all(current_epoch, total_epoch)

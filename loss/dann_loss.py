@@ -85,13 +85,14 @@ def _loss_DANN_splitted(
     domain_loss = (domain_loss_on_src + domain_loss_on_trg) / (source_len + target_len)
     loss = domain_loss_weight * domain_loss \
            + prediction_loss_weight * prediction_loss
+    
     return loss, {
-        "domain_loss_on_src": domain_loss_on_src,
-        "domain_loss_on_trg": domain_loss_on_trg,
-        "domain_loss": domain_loss,
-        "prediction_loss_on_src": prediction_loss_on_src,
-        "prediction_loss_on_trg": prediction_loss_on_trg,
-        "prediction_loss": prediction_loss
+        "domain_loss_on_src": domain_loss_on_src.data.cpu().item() / source_len,
+        "domain_loss_on_trg": domain_loss_on_trg.data.cpu().item() / target_len,
+        "domain_loss": domain_loss.data.cpu().item(),
+        "prediction_loss_on_src": prediction_loss_on_src.data.cpu().item(),
+        "prediction_loss_on_trg": prediction_loss_on_trg.data.cpu().item(),
+        "prediction_loss": prediction_loss.data.cpu().item()
     }
 
 
