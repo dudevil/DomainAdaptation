@@ -64,3 +64,42 @@ class DANNModel(BaseModel):
         target task.
         """
         return self.forward(input_data)["class"] 
+
+
+class OneDomainModel(BaseModel):
+    def __init__(self):
+        super(OneDomainModel, self).__init__()
+        self.features, self.pooling, self.class_classifier, *_ = backbone_models.get_backbone_model()
+
+    def forward(self, input_data):
+        """
+        Args:
+            input_data (torch.tensor) - batch of input images
+        Return:
+            output (map of tensors) - map with model output tensors
+        """
+        features = self.features(input_data)
+        features = self.pooling(features)
+        features = torch.flatten(features, 1)
+        
+        output_classifier = features
+        for block in self.class_classifier:
+            output_classifier = block(output_classifier)
+
+        output = {
+            "class": output_classifier,
+        }
+        
+        return output
+
+    def predict(self, input_data):
+        """
+        Args:
+            input_data (torch.tensor) - batch of input images
+        Return:
+            output (tensor) - model predictions
+
+        Function for testing process when need to solve only
+        target task.
+        """
+        return self.forward(input_data)["class"]     
