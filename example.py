@@ -1,39 +1,18 @@
 import torch
 import os
+import wandb
 
 from trainer import Trainer
 from loss import loss_DANN
 from models import DANNModel
 from dataloader import create_data_generators
 from metrics import AccuracyScoreFromLogits
-from utils.callbacks import simple_callback, print_callback, ModelSaver, HistorySaver
+from utils.callbacks import simple_callback, print_callback, ModelSaver, HistorySaver, WandbCallback
 from utils.schedulers import LRSchedulerSGD
 import configs.dann_config as dann_config
 
 # os.environ['CUDA_VISIBLE_DEVICES'] = '4, 5'
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-def debug_loss(*args, **kwargs):
-    loss, rich_loss = loss_DANN(*args, **kwargs)
-    loss_string = '   '.join(['{}: {:.5f}\t'.format(k, float(v)) for k, v in rich_loss.items()])
-    print(f"step_loss: {loss_string}")
-    return loss, rich_loss
-
-
-class DebugMetric:
-    score = 1
-    name = 'test'
-
-    def __init__(self, metric):
-        self.metric = metric
-
-    def reset(self):
-        self.metric.reset()
-
-    def __call__(self, *args, **kwargs):
-        pass
-        print(f"Call metric with args:\n{args}\n{kwargs}")
-        print("metric: ", self.metric(*args, **kwargs))
 
 
 if __name__ == '__main__':
@@ -55,7 +34,6 @@ if __name__ == '__main__':
 
     model = DANNModel().to(device)
     acc = AccuracyScoreFromLogits()
-    mmm = DebugMetric(acc)
 
     scheduler = LRSchedulerSGD()
     tr = Trainer(model, loss_DANN)
@@ -71,6 +49,8 @@ if __name__ == '__main__':
            callbacks=[print_callback(watch=["loss", "domain_loss", "val_loss",
                                             "val_domain_loss", 'trg_metrics', 'src_metrics']),
                       ModelSaver('DANN', dann_config.SAVE_MODEL_FREQ),
+                      WandbCallback(),
                       HistorySaver('log_with_sgd', dann_config.VAL_FREQ,
                                    extra_losses={'domain_loss': ['domain_loss', 'val_domain_loss'],
                                                  'train_domain_loss': ['domain_loss_on_src', 'domain_loss_on_trg']})])
+    wandb.join()

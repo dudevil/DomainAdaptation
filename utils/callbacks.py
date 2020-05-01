@@ -1,4 +1,6 @@
+import wandb
 import os
+import configs.dann_config as dann_config
 
 
 def simple_callback(model, epoch_log, current_epoch, total_epoch):
@@ -136,3 +138,28 @@ class HistorySaver:
 
         if self.is_plotting:
             self.plot_all(current_epoch, total_epoch)
+
+
+def dict_from_module(module):
+    context = {}
+    for setting in dir(module):
+        if not setting.startswith("__"):
+            context[setting] = getattr(module, setting)
+
+    return context
+
+
+class WandbCallback:
+    def __init__(self, *args, **kwargs):
+        """
+        Callback that logs everything to wandb
+        """
+        wandb.init(*args, **kwargs, project="DomainAdaptation", entity='arqwer', reinit=True)
+        wandb.config.update(dict_from_module(dann_config))
+
+    def __call__(self, model, epoch_log, current_epoch, total_epoch):
+        logged = {
+            'epoch': current_epoch
+        }
+        logged.update(epoch_log)
+        wandb.log(logged)
