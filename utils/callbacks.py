@@ -92,6 +92,7 @@ class HistorySaver:
             else:
                 self.plt.plot(data[key], label=key)
 
+        self.plt.grid()
         self.plt.legend()
         self.plt.title('{} history for {} epochs of {}'.format(name, current_epoch + 1, total_epoch))
         self.plt.savefig(os.path.join(self.path, name + '_plot'))
