@@ -35,7 +35,7 @@ if __name__ == '__main__':
     model = DANNModel().to(device)
     acc = AccuracyScoreFromLogits()
 
-    scheduler = LRSchedulerSGD()
+    scheduler = LRSchedulerSGD(blocks_with_smaller_lr=dann_config.BLOCKS_WITH_SMALLER_LR)
     tr = Trainer(model, loss_DANN)
     tr.fit(train_gen_s, train_gen_t,
            n_epochs=dann_config.N_EPOCHS,

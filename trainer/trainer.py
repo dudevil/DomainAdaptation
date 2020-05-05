@@ -47,7 +47,15 @@ class Trainer:
         if opt == 'adam':
             opt = torch.optim.Adam(self.model.parameters(), **opt_kwargs)
         elif opt == 'sgd':
-            opt = torch.optim.SGD(self.model.parameters(), **opt_kwargs)
+            parameters = self.model.parameters()
+            if hasattr(self.model, "adaptation_block"):
+                parameters = [{ "params": self.model.features.parameters(), "lr": 0.1 * opt_kwargs["lr"] },
+                              { "params": self.model.class_classifier[:-1].parameters(), "lr": 0.1 * opt_kwargs["lr"] },
+                              { "params": self.model.class_classifier[-1].parameters() },
+                              { "params": self.model.domain_classifier.parameters() },
+                              { "params": self.model.adaptation_block.parameters() },
+                ]
+            opt = torch.optim.SGD(parameters, **opt_kwargs)
         else:
             raise NotImplementedError
 

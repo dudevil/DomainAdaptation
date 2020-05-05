@@ -19,6 +19,16 @@ class DANNModel(BaseModel):
         self.features, self.pooling, self.class_classifier, \
             domain_input_len, self.classifier_before_domain_cnt = backbone_models.get_backbone_model()
         
+        if dann_config.NEED_ADAPTATION_BLOCK:
+            self.adaptation_block = nn.Sequential(
+                nn.ReLU(),
+                nn.Linear(domain_input_len, 2048),
+                nn.ReLU(inplace=True),
+            )
+            domain_input_len = 2048
+            classifier_start_output_len = self.class_classifier[self.classifier_before_domain_cnt][-1].out_features
+            self.class_classifier[self.classifier_before_domain_cnt][-1] = nn.Linear(2048, classifier_start_output_len)
+
         self.domain_classifier = domain_heads.get_domain_head(domain_input_len)
 
     def forward(self, input_data, rev_grad_alpha=dann_config.GRADIENT_REVERSAL_LAYER_ALPHA):
@@ -33,15 +43,20 @@ class DANNModel(BaseModel):
         features = torch.flatten(features, 1)
 
         output_classifier = features
-        domain_features = features
         classifier_layers_outputs = []
-        for i, block in enumerate(self.class_classifier):
-            if i == self.classifier_before_domain_cnt:
-                domain_features = output_classifier
-            output_classifier = block(output_classifier)
+        for i in range(self.classifier_before_domain_cnt):
+            output_classifier = self.class_classifier[i](output_classifier)
             classifier_layers_outputs.append(output_classifier)
 
-        reversed_features = blocks.GradientReversalLayer.apply(domain_features, rev_grad_alpha)
+        if dann_config.NEED_ADAPTATION_BLOCK:
+            output_classifier = self.adaptation_block(output_classifier)
+
+        reversed_features = blocks.GradientReversalLayer.apply(output_classifier, rev_grad_alpha)
+
+        for i in range(self.classifier_before_domain_cnt, len(self.class_classifier)):
+            output_classifier = self.class_classifier[i](output_classifier)
+            classifier_layers_outputs.append(output_classifier)
+        
         output_domain = self.domain_classifier(reversed_features)
 
         output = {
@@ -63,7 +78,7 @@ class DANNModel(BaseModel):
         Function for testing process when need to solve only
         target task.
         """
-        return self.forward(input_data)["class"] 
+        return self.forward(input_data)["class"]
 
 
 class OneDomainModel(BaseModel):

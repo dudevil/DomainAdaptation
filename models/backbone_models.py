@@ -13,8 +13,8 @@ def split_layers(model, layer_ids):
 
     Function for splitting nn.Sequential model in separate
     layers, which indexed by numbers from the list layer_ids.
-    It will be required to obtain activations of intermediate model layers
-    and calculate loss function between intermediate layers
+    It will be required to obtain activations of intermediate model layers
+    and calculate loss function between intermediate layers
     """
     separate_layers = list(model)
     layers = []
@@ -39,7 +39,7 @@ def get_backbone_model():
         classifier_before_domain_cnt (int) - amount of layers to skip in classifier
 
     Returns three parts of model — the convolutional part to extract features,
-    part with pooling and part with fully connected model layers.
+    part with pooling and part with fully connected model layers.
     Can return these parts with pre-trained weights for standard architecture.
     """
     if dann_config.MODEL_BACKBONE == "alexnet":
