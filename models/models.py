@@ -18,7 +18,7 @@ class DANNModel(BaseModel):
         super(DANNModel, self).__init__()
         self.features, self.pooling, self.class_classifier, \
             domain_input_len, self.classifier_before_domain_cnt = backbone_models.get_backbone_model()
-        
+
         if dann_config.NEED_ADAPTATION_BLOCK:
             self.adaptation_block = nn.Sequential(
                 nn.ReLU(),
@@ -62,7 +62,9 @@ class DANNModel(BaseModel):
         output = {
             "class": output_classifier,
             "domain": output_domain,
+            "features": features
         }
+
         if dann_config.LOSS_NEED_INTERMEDIATE_LAYERS:
             output["classifier_layers"] = classifier_layers_outputs
 
@@ -79,6 +81,29 @@ class DANNModel(BaseModel):
         target task.
         """
         return self.forward(input_data)["class"]
+
+    def get_features(self, input_data):
+        """
+        Args:
+            input_data (torch.tensor) - batch of input images
+        Return:
+            output (tensor) - model predictions
+
+        Function for testing process when need to solve only
+        target task.
+        """
+        output = self.forward(input_data)
+        if not dann_config.LOSS_NEED_INTERMEDIATE_LAYERS and dann_config.FEATURES == 'before_class':
+            raise RuntimeError('intermediate layers outputs are not saved')
+        if dann_config.FEATURES == 'before_class':
+            return output["classifier_layers"][-2]
+        if not dann_config.LOSS_NEED_INTERMEDIATE_LAYERS and dann_config.FEATURES == 'before_bottleneck':
+            raise RuntimeError('intermediate layers outputs are not saved')
+        if dann_config.FEATURES == 'before_bottleneck':
+            return output["classifier_layers"][-4]
+        if dann_config.FEATURES == 'after_conv':
+            return output["features"]
+        raise RuntimeError(str(dann_config.FEATURES + ' is not implemented'))
 
 
 class OneDomainModel(BaseModel):

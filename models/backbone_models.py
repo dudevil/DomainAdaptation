@@ -48,6 +48,9 @@ def get_backbone_model():
     elif dann_config.MODEL_BACKBONE == "resnet50":
         features, pooling, classifier, \
             classifier_layer_ids, domain_input_len, classifier_before_domain_cnt = get_resnet50()
+    elif dann_config.MODEL_BACKBONE == "resnet50_rich":
+        features, pooling, classifier, \
+            classifier_layer_ids, domain_input_len, classifier_before_domain_cnt = get_resnet50_rich_classifier()
     elif dann_config.MODEL_BACKBONE == 'vanilla_dann' and not dann_config.BACKBONE_PRETRAINED:
         features, pooling, classifier, \
             classifier_layer_ids, domain_input_len, classifier_before_domain_cnt = get_vanilla_dann()
@@ -59,6 +62,14 @@ def get_backbone_model():
             % (dann_config.MODEL_BACKBONE, dann_config.BACKBONE_PRETRAINED))
 
     classifier = nn.ModuleList(split_layers(classifier, classifier_layer_ids))
+    if dann_config.FREEZE_BACKBONE_FEATURES and dann_config.FREEZE_LEVEL is not None:
+        if dann_config.FREEZE_LEVEL > 10 and dann_config.MODEL_BACKBONE == "alexnet":
+            raise ValueError('FREEZE_LEVEL greater than number of layers')
+        for i, param in enumerate(features.parameters()):
+            # possible for AlexNet: 0, 2, 4, 6, 8, 10
+            # possible for ResNet: 0, 1, 3, 33, 72, 129, 141, 159
+            if i < dann_config.FREEZE_LEVEL:
+                param.requires_grad = False
     return features, pooling, classifier, domain_input_len, classifier_before_domain_cnt
 
 
@@ -67,10 +78,6 @@ def get_alexnet():
     model = alexnet(pretrained=dann_config.BACKBONE_PRETRAINED)
     features, pooling, classifier = model.features, model.avgpool, model.classifier
     classifier[-2] = nn.ReLU()
-    if dann_config.FREZE_BACKBONE_FEATURES:
-        for i, param in enumerate(features.parameters()):
-            if i < 0: # possible: 0, 2, 4, 6, 8, 10
-                param.requires_grad = False
     classifier[-1] = nn.Linear(4096, dann_config.CLASSES_CNT)
     classifier_layer_ids = [1, 4, 6]
     pooling_ftrs = 256
@@ -91,17 +98,59 @@ def get_resnet50():
         model.layer3,
         model.layer4,
     )
-    if dann_config.FREZE_BACKBONE_FEATURES:
-        for i, param in enumerate(features.parameters()):
-            if i < 141: # possible: 0, 1, 3, 33, 72, 129, 141, 159
-                param.requires_grad = False
-
     pooling = model.avgpool
     classifier = nn.Sequential(nn.Linear(2048, dann_config.CLASSES_CNT))
     classifier_layer_ids = [0]
     pooling_ftrs = 2048
     pooling_output_side = 1
     return features, pooling, classifier, classifier_layer_ids, 2048, 0
+
+
+def get_resnet50_rich_classifier():
+    from torchvision.models import resnet50
+    model = resnet50(pretrained=dann_config.BACKBONE_PRETRAINED)
+    features = nn.Sequential(
+        model.conv1,
+        model.bn1,
+        model.relu,
+        model.maxpool,
+        model.layer1,
+        model.layer2,
+        model.layer3,
+        model.layer4,
+    )
+    pooling = model.avgpool
+    if dann_config.NEED_ADAPTATION_BLOCK_AV:
+        domain_input_len = dann_config.BOTTLENECK_SIZE
+        classifier = nn.Sequential(
+            nn.Linear(2048, 2048),
+            nn.BatchNorm1d(2048),
+            nn.Dropout2d(),
+            nn.ReLU(),
+            nn.Linear(2048, domain_input_len),
+            nn.BatchNorm1d(domain_input_len),
+            nn.ReLU(),
+            nn.Linear(domain_input_len, 2048),
+            nn.ReLU(),
+            nn.Linear(2048, dann_config.CLASSES_CNT),
+            )
+        classifier_layer_ids = [0, 4, 7, 9]
+    else:
+        domain_input_len = 2048
+        classifier = nn.Sequential(
+            nn.Linear(2048, 2048),
+            nn.BatchNorm1d(2048),
+            nn.Dropout2d(),
+            nn.ReLU(),
+            nn.Linear(2048, domain_input_len),
+            nn.BatchNorm1d(domain_input_len),
+            nn.ReLU(),
+            nn.Linear(domain_input_len, dann_config.CLASSES_CNT),
+            )
+        classifier_layer_ids = [0, 4, 7]
+    pooling_ftrs = 2048
+    pooling_output_side = 1
+    return features, pooling, classifier, classifier_layer_ids, domain_input_len, 2
 
 
 def get_vanilla_dann():

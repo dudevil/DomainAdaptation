@@ -1,6 +1,6 @@
 import torch
 from trainer.logger import AvgLossLogger
-
+import configs.dann_config as dann_config
 
 class Trainer:
     def __init__(self, model, loss):
@@ -32,6 +32,7 @@ class Trainer:
         batch['src_images'] = src_images
         batch['trg_images'] = trg_images
         batch['src_classes'] = src_classes
+        trg_classes = torch.zeros_like(trg_classes)
         batch['trg_classes'] = trg_classes
         return batch
 
@@ -48,7 +49,7 @@ class Trainer:
             opt = torch.optim.Adam(self.model.parameters(), **opt_kwargs)
         elif opt == 'sgd':
             parameters = self.model.parameters()
-            if hasattr(self.model, "adaptation_block"):
+            if dann_config.NEED_ADAPTATION_BLOCK and hasattr(self.model, "adaptation_block"):
                 parameters = [{ "params": self.model.features.parameters(), "lr": 0.1 * opt_kwargs["lr"] },
                               { "params": self.model.class_classifier[:-1].parameters(), "lr": 0.1 * opt_kwargs["lr"] },
                               { "params": self.model.class_classifier[-1].parameters() },

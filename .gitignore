@@ -114,6 +114,9 @@ dmypy.json
 
 # logs
 _log/
-checkpoints
+checkpoints/
+wandb/
+embeddings/
+
 
 # End of https://www.gitignore.io/api/python

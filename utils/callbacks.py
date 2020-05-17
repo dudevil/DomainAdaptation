@@ -40,10 +40,15 @@ class print_callback:
 
 
 class ModelSaver:
-    def __init__(self, model_type, save_freq=1, path="checkpoints"):
+    def __init__(self, model_type, save_freq=1, path="checkpoints", save_by_schedule=True,
+                 save_best=False, eval_metric=None):
         self.model_type = model_type
         self.path = path
+        self.save_by_schedule = save_by_schedule
         self.save_freq = save_freq
+        self.save_best = save_best
+        self.eval_metric = eval_metric
+        self.best_metric = 0
         if not os.path.exists(path):
             os.makedirs(path)
         if not os.path.exists(os.path.join(path, model_type)):
@@ -51,7 +56,15 @@ class ModelSaver:
 
     def __call__(self, model, epoch_log, current_epoch, total_epoch):
         import torch
-        if current_epoch % self.save_freq == 0:
+        if self.save_best and self.eval_metric is not None:
+            if current_epoch == 0:
+                self.best_metric = epoch_log['trg_metrics'][self.eval_metric]
+            if epoch_log['trg_metrics'][self.eval_metric] > self.best_metric:
+                filename = os.path.join(self.path, self.model_type, "best_metric_on_trg.pt")
+                torch.save(model.state_dict(), filename)
+                self.best_metric = epoch_log['trg_metrics'][self.eval_metric]
+
+        if self.save_by_schedule and current_epoch % self.save_freq == 0:
             filename = os.path.join(self.path, self.model_type, "epoch_{}.pt".format(current_epoch))
             torch.save(model.state_dict(), filename)
 
@@ -151,11 +164,12 @@ def dict_from_module(module):
 
 
 class WandbCallback:
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, config=dann_config, **kwargs):
         """
         Callback that logs everything to wandb
         """
-        wandb.init(*args, **kwargs, project="DomainAdaptation", entity='arqwer', reinit=True)
+        wandb.init(*args, **kwargs, project="domain_adaptation", reinit=True)
+        # wandb.init(*args, **kwargs, project="DomainAdaptation", entity='arqwer', reinit=True)
         wandb.config.update(dict_from_module(dann_config))
 
     def __call__(self, model, epoch_log, current_epoch, total_epoch):
